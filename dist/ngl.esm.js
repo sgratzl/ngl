@@ -56915,6 +56915,8 @@ Queue.prototype.length = function length () {
  * @param {RepresentationParameters} [params] - representation parameters
  */
 var Representation = function Representation(object, viewer, params) {
+    // eslint-disable-next-line no-unused-vars
+    // const p = params || {}
     this.type = '';
     this.parameters = {
         lazy: {
@@ -57122,6 +57124,8 @@ Representation.prototype.getColorParams = function getColorParams (p) {
     }, p);
 };
 Representation.prototype.getBufferParams = function getBufferParams (p) {
+        if ( p === void 0 ) p = {};
+
     return Object.assign({
         clipNear: this.clipNear,
         clipRadius: this.clipRadius,
@@ -57153,14 +57157,14 @@ Representation.prototype.setColor = function setColor (value, p) {
         }
     }
     else if (value !== undefined) {
-        value = new Color(value).getHex();
+        var val = new Color(value).getHex(); //TODO
         if (p) {
             p.colorScheme = 'uniform';
-            p.colorValue = value;
+            p.colorValue = val;
         }
         else {
             this.setParameters({
-                colorScheme: 'uniform', colorValue: value
+                colorScheme: 'uniform', colorValue: val
             });
         }
     }
@@ -57171,7 +57175,7 @@ Representation.prototype.setColor = function setColor (value, p) {
 Representation.prototype.create = function create () {
     // this.bufferList.length = 0;
 };
-Representation.prototype.update = function update () {
+Representation.prototype.update = function update (what) {
     this.build();
 };
 Representation.prototype.build = function build (updateWhat) {
@@ -57251,7 +57255,7 @@ Representation.prototype.setVisibility = function setVisibility (value, noRender
         if (lazyProps.build) {
             lazyProps.build = false;
             this.build();
-            return;
+            return this;
         }
         else if (Object.keys(bufferParams).length || Object.keys(what).length) {
             lazyProps.bufferParams = {};
@@ -57327,7 +57331,8 @@ Representation.prototype.setParameters = function setParameters (params, what, r
                 bufferParams[name] = p[name];
             }
             else {
-                bufferParams[tp[name].buffer] = p[name];
+                var key = tp[name].buffer;
+                bufferParams[key] = p[name];
             }
         }
         // mark for update
@@ -57353,7 +57358,7 @@ Representation.prototype.setParameters = function setParameters (params, what, r
 Representation.prototype.updateParameters = function updateParameters (bufferParams, what) {
         if ( bufferParams === void 0 ) bufferParams = {};
 
-    if (this.lazy && (!this.visible || !this.opacity) && bufferParams.opacity === undefined) {
+    if (this.lazy && (!this.visible || !this.opacity) && bufferParams.hasOwnProperty('opacity') === false) {
         Object.assign(this.lazyProps.bufferParams, bufferParams);
         Object.assign(this.lazyProps.what, what);
         return;
@@ -61404,6 +61409,7 @@ function getContactData(contacts, structure, params) {
         position1: new Float32Array(position1),
         position2: new Float32Array(position2),
         color: new Float32Array(color),
+        color2: new Float32Array(color),
         radius: new Float32Array(radius),
         picking: new ContactPicker(picking, contacts, structure)
     };
@@ -65351,20 +65357,6 @@ var ContourBuffer = (function (Buffer$$1) {
  * @private
  */
 /**
- * Surface representation parameter object. Extends {@link RepresentationParameters}
- *
- * @typedef {Object} SurfaceRepresentationParameters - surface representation parameters
- *
- * @property {String} isolevelType - Meaning of the isolevel value. Either *value* for the literal value or *sigma* as a factor of the sigma of the data. For volume data only.
- * @property {Float} isolevel - The value at which to create the isosurface. For volume data only.
- * @property {Integer} smooth - How many iterations of laplacian smoothing after surface triangulation. For volume data only.
- * @property {Boolean} background - Render the surface in the background, unlit.
- * @property {Boolean} opaqueBack - Render the back-faces (where normals point away from the camera) of the surface opaque, ignoring the transparency parameter.
- * @property {Integer} boxSize - Size of the box to triangulate volume data in. Set to zero to triangulate the whole volume. For volume data only.
- * @property {Boolean} useWorker - Weather or not to triangulate the volume asynchronously in a Web Worker. For volume data only.
- * @property {Boolean} wrap - Wrap volume data around the edges; use in conjuction with boxSize but not larger than the volume dimension. For volume data only.
- */
-/**
  * Surface representation
  */
 var SurfaceRepresentation = (function (Representation$$1) {
@@ -65524,8 +65516,10 @@ var SurfaceRepresentation = (function (Representation$$1) {
             buffer = new ContourBuffer(sd, this.getBufferParams({ wireframe: false }));
         }
         else {
-            sd.normal = this.surface.getNormal();
-            sd.picking = this.surface.getPicking();
+            Object.assign(sd, {
+                normal: this.surface.getNormal(),
+                picking: this.surface.getPicking()
+            });
             var surfaceBuffer = new SurfaceBuffer(sd, this.getBufferParams({
                 background: this.background,
                 opaqueBack: this.opaqueBack,
@@ -65596,7 +65590,8 @@ var SurfaceRepresentation = (function (Representation$$1) {
             this.volume.getBox(this.boxCenter, this.boxSize, this.box);
         }
         if (params && params.colorVolume !== undefined) {
-            what.color = true;
+            if (what)
+                { what.color = true; }
         }
         if (this.surface && (params.isolevel !== undefined ||
             params.negateIsolevel !== undefined ||
@@ -74079,16 +74074,6 @@ BufferRegistry.add('point', PointBuffer);
  * @private
  */
 /**
- * Dot representation parameter object. Extends {@link RepresentationParameters}
- *
- * @typedef {Object} DotRepresentationParameters - dot representation parameters
- *
- * @property {String} thresholdType - Meaning of the threshold values. Either *value* for the literal value or *sigma* as a factor of the sigma of the data. For volume data only.
- * @property {Number} thresholdMin - Minimum value to be displayed. For volume data only.
- * @property {Number} thresholdMax - Maximum value to be displayed. For volume data only.
- * @property {Number} thresholdOut - Show only values falling outside of the treshold minumum and maximum. For volume data only.
- */
-/**
  * Dot representation
  */
 var DotRepresentation = (function (Representation$$1) {
@@ -74231,20 +74216,28 @@ var DotRepresentation = (function (Representation$$1) {
                 thresholdMax = this.thresholdMax;
             }
             volume.setFilter(thresholdMin, thresholdMax, this.thresholdOut);
-            dotData.position = volume.getDataPosition();
-            dotData.color = volume.getDataColor(this.getColorParams());
+            Object.assign(dotData, {
+                position: volume.getDataPosition(),
+                color: volume.getDataColor(this.getColorParams())
+            });
             if (this.dotType === 'sphere') {
-                dotData.radius = volume.getDataSize(this.radius, this.scale);
-                dotData.picking = volume.getDataPicking();
+                Object.assign(dotData, {
+                    radius: volume.getDataSize(this.radius, this.scale),
+                    picking: volume.getDataPicking()
+                });
             }
         }
         else {
             var surface = this.surface;
-            dotData.position = surface.getPosition();
-            dotData.color = surface.getColor(this.getColorParams());
+            Object.assign(dotData, {
+                position: surface.getPosition(),
+                color: surface.getColor(this.getColorParams())
+            });
             if (this.dotType === 'sphere') {
-                dotData.radius = surface.getSize(this.radius, this.scale);
-                dotData.picking = surface.getPicking();
+                Object.assign(dotData, {
+                    radius: surface.getSize(this.radius, this.scale),
+                    picking: surface.getPicking()
+                });
             }
         }
         if (this.dotType === 'sphere') {
@@ -74268,30 +74261,40 @@ var DotRepresentation = (function (Representation$$1) {
         this.bufferList.push(this.dotBuffer);
     };
     DotRepresentation.prototype.update = function update (what) {
+        if ( what === void 0 ) what = {};
+
         if (this.bufferList.length === 0)
             { return; }
-        what = what || {};
         var dotData = {};
         if (what.color) {
             if (this.volume) {
-                dotData.color = this.volume.getDataColor(this.getColorParams());
+                Object.assign(dotData, {
+                    color: this.volume.getDataColor(this.getColorParams())
+                });
             }
             else {
-                dotData.color = this.surface.getColor(this.getColorParams());
+                Object.assign(dotData, {
+                    color: this.surface.getColor(this.getColorParams())
+                });
             }
         }
         if (this.dotType === 'sphere' && (what.radius || what.scale)) {
             if (this.volume) {
-                dotData.radius = this.volume.getDataSize(this.radius, this.scale);
+                Object.assign(dotData, {
+                    radius: this.volume.getDataSize(this.radius, this.scale)
+                });
             }
             else {
-                dotData.radius = this.surface.getSize(this.radius, this.scale);
+                Object.assign(dotData, {
+                    radius: this.surface.getSize(this.radius, this.scale)
+                });
             }
         }
         this.dotBuffer.setAttributes(dotData);
     };
     DotRepresentation.prototype.setParameters = function setParameters (params, what, rebuild) {
-        what = what || {};
+        if ( what === void 0 ) what = {};
+
         if (params && params.thresholdType !== undefined &&
             this.volume instanceof Volume) {
             if (this.thresholdType === 'value' &&
@@ -74652,20 +74655,6 @@ VolumeSlice.prototype.getData = function getData (params) {
  * @file Slice Representation
  * @author Alexander Rose <alexander.rose@weirdbyte.de>
  * @private
- */
-/**
- * Slice representation parameter object. Extends {@link RepresentationParameters}
- *
- * @typedef {Object} SliceRepresentationParameters - slice representation parameters
- *
- * @property {String} filter - filter applied to map the volume data on the slice, one of "nearest", "linear", "cubic-bspline", "cubic-catmulrom", "cubic-mitchell".
- * @property {String} positionType - Meaning of the position value. Either "persent" od "coordinate".
- * @property {Number} position - position of the slice.
- * @property {String} dimension - one of "x", "y" or "z"
- * @property {String} thresholdType - Meaning of the threshold values. Either *value* for the literal value or *sigma* as a factor of the sigma of the data. For volume data only.
- * @property {Number} thresholdMin - Minimum value to be displayed. For volume data only.
- * @property {Number} thresholdMax - Maximum value to be displayed. For volume data only.
- * @property {Boolean} normalize - Flag indicating wheather to normalize the data in a slice when coloring.
  */
 /**
  * Slice representation
@@ -79941,16 +79930,6 @@ ComponentRegistry.add('shape', ShapeComponent);
  * @private
  */
 /**
- * Structure representation parameter object.
- * @typedef {Object} StructureRepresentationParameters - structure representation parameters
- * @mixes RepresentationParameters
- *
- * @property {String} radiusType - A list of possible sources of the radius used for rendering the representation. The radius can be based on the *vdW radius*, the *covalent radius* or the *B-factor* value of the corresponding atom. Additionally the radius can be based on the *secondary structure*. Alternatively, when set to *size*, the value from the *radius* parameter is used for all atoms.
- * @property {Float} radius - A number providing a fixed radius used for rendering the representation.
- * @property {Float} scale - A number that scales the value defined by the *radius* or the *radiusType* parameter.
- * @property {String} assembly - name of an assembly object. Included are the asymmetric unit (*AU*) corresponding to the coordinates given in the structure file, biological assemblies from *PDB*, *mmCIF* or *MMTF* files (*BU1*, *BU2*, ...), a filled (crystallographic) unitcell of a given space group (*UNITCELL*), a supercell consisting of a center unitcell and its 26 direct neighbors (*SUPERCELL*). Set to *default* to use the default asemmbly of the structure object.
- */
-/**
  * Structure representation
  * @interface
  */
@@ -80028,6 +80007,8 @@ var StructureRepresentation = (function (Representation$$1) {
         };
     };
     StructureRepresentation.prototype.init = function init (params) {
+        var this$1 = this;
+
         var p = params || {};
         p.colorScheme = defaults(p.colorScheme, 'element');
         this.setRadius(p.radius, p);
@@ -80042,8 +80023,8 @@ var StructureRepresentation = (function (Representation$$1) {
         }
         Representation$$1.prototype.init.call(this, p);
         this.selection.signals.stringChanged.add(function ( /* sele */) {
-            this.build();
-        }, this);
+            this$1.build();
+        });
         this.build();
     };
     StructureRepresentation.prototype.setRadius = function setRadius (value, p) {
@@ -80089,6 +80070,8 @@ var StructureRepresentation = (function (Representation$$1) {
         }
     };
     StructureRepresentation.prototype.create = function create () {
+        var this$1 = this;
+
         if (this.structureView.atomCount === 0)
             { return; }
         if (!this.structureView.hasCoords()) {
@@ -80101,16 +80084,16 @@ var StructureRepresentation = (function (Representation$$1) {
         var assembly = this.getAssembly();
         if (assembly) {
             assembly.partList.forEach(function (part, i) {
-                var sview = part.getView(this.structureView);
+                var sview = part.getView(this$1.structureView);
                 if (sview.atomCount === 0)
                     { return; }
-                var data = this.createData(sview, i);
+                var data = this$1.createData(sview, i);
                 if (data) {
                     data.sview = sview;
                     data.instanceList = part.getInstanceList();
-                    this.dataList.push(data);
+                    this$1.dataList.push(data);
                 }
-            }, this);
+            });
         }
         else {
             var data = this.createData(this.structureView, 0);
@@ -80120,10 +80103,9 @@ var StructureRepresentation = (function (Representation$$1) {
             }
         }
     };
-    StructureRepresentation.prototype.createData = function createData ( /* sview */) {
-        console.error('createData not implemented');
-    };
     StructureRepresentation.prototype.update = function update (what) {
+        var this$1 = this;
+
         if (this.lazy && !this.visible) {
             Object.assign(this.lazyProps.what, what);
             return;
@@ -80134,19 +80116,17 @@ var StructureRepresentation = (function (Representation$$1) {
         }
         this.dataList.forEach(function (data) {
             if (data.bufferList.length > 0) {
-                this.updateData(what, data);
+                this$1.updateData(what, data);
             }
         }, this);
     };
-    StructureRepresentation.prototype.updateData = function updateData ( /* what, data */) {
+    StructureRepresentation.prototype.updateData = function updateData (what, data) {
         this.build();
     };
     StructureRepresentation.prototype.getColorParams = function getColorParams () {
-        var p = Representation$$1.prototype.getColorParams.call(this);
-        p.structure = this.structure;
-        return p;
+        return Object.assign({}, Representation$$1.prototype.getColorParams.call(this), { structure: this.structure });
     };
-    StructureRepresentation.prototype.getRadiusParams = function getRadiusParams () {
+    StructureRepresentation.prototype.getRadiusParams = function getRadiusParams (param) {
         return {
             type: this.radiusType,
             scale: this.radiusScale,
@@ -80260,17 +80240,6 @@ var StructureRepresentation = (function (Representation$$1) {
  * @file Measurement Representation
  * @author Fred Ludlow <fred.ludlow@gmail.com>
  * @private
- */
-/**
- * Measurement representation parameter object.
- * @typedef {Object} MeasurementRepresentationParameters - measurement representation parameters
- * @mixes RepresentationParameters
- * @mixes StructureRepresentationParameters
- *
- * @property {Float} labelSize - size of the distance label
- * @property {Color} labelColor - color of the distance label
- * @property {Boolean} labelVisible - visibility of the distance label
- * @property {Float} labelZOffset - offset in z-direction (i.e. in camera direction)
  */
 /**
  * Measurement representation
@@ -80417,17 +80386,18 @@ var MeasurementRepresentation = (function (StructureRepresentation$$1) {
     MeasurementRepresentation.prototype.updateData = function updateData (what, data) {
         var textData = {};
         if (!what || what.labelSize) {
-            textData.size = uniformArray(this.n, this.labelSize);
+            Object.assign(textData, { size: uniformArray(this.n, this.labelSize) });
         }
         if (!what || what.labelColor) {
             var c = new Color(this.labelColor);
-            textData.color = uniformArray3(this.n, c.r, c.g, c.b);
+            Object.assign(textData, { color: uniformArray3(this.n, c.r, c.g, c.b) });
         }
         this.textBuffer.setAttributes(textData);
     };
-    MeasurementRepresentation.prototype.setParameters = function setParameters (params) {
-        var rebuild = false;
-        var what = {};
+    MeasurementRepresentation.prototype.setParameters = function setParameters (params, what, rebuild) {
+        if ( what === void 0 ) what = {};
+        if ( rebuild === void 0 ) rebuild = false;
+
         if (params && params.labelSize) {
             what.labelSize = true;
         }
@@ -80453,6 +80423,8 @@ var MeasurementRepresentation = (function (StructureRepresentation$$1) {
         return this;
     };
     MeasurementRepresentation.prototype.getLabelBufferParams = function getLabelBufferParams (params) {
+        if ( params === void 0 ) params = {};
+
         return StructureRepresentation$$1.prototype.getBufferParams.call(this, Object.assign({
             fontFamily: this.labelFontFamily,
             fontStyle: this.labelFontStyle,
@@ -80508,7 +80480,7 @@ function parseNestedAtoms(sview, atoms) {
         var _break = false;
         for (var j = 0; j < order; j++) {
             var value = group[j];
-            if (Number.isInteger(value)) {
+            if (typeof (value) === 'number' && Number.isInteger(value)) {
                 if (selected.get(value)) {
                     ap.index = value;
                 }
@@ -81120,20 +81092,6 @@ BufferRegistry.add('wideline', WideLineBuffer);
  * @private
  */
 /**
- * @typedef {Object} AngleRepresentationParameters - angle representation parameters
- * @mixes RepresentationParameters
- * @mixes StructureRepresentationParameters
- * @mixes MeasurementRepresentationParameters
- *
- * @property {String} atomTriple - list of triplets of selection strings
- *                                 or atom indices
- * @property {Boolean} vectorVisible - Indicate the 3 points for each angle by drawing lines 1-2-3
- * @property {Boolean} arcVisible - Show the arc outline for each angle
- * @property {Number}  lineOpacity - opacity for the line part of the representation
- * @property {Number} linewidth - width for line part of representation
- * @property {Boolean} sectorVisible - Show the filled arc for each angle
- */
-/**
  * Angle representation object
  *
  * Reperesentation consists of four parts, visibility can be set for each
@@ -81239,9 +81197,17 @@ var AngleRepresentation = (function (MeasurementRepresentation$$1) {
         var sectorData = {};
         if (what.color) {
             var c = new Color(this.colorValue);
-            vectorData.color = vectorData.color2 = uniformArray3(this.n * 2, c.r, c.g, c.b);
-            arcData.color = arcData.color2 = uniformArray3(this.arcLength, c.r, c.g, c.b);
-            sectorData.color = uniformArray3(this.sectorLength, c.r, c.g, c.b);
+            Object.assign(vectorData, {
+                color: uniformArray3(this.n * 2, c.r, c.g, c.b),
+                color2: uniformArray3(this.n * 2, c.r, c.g, c.b)
+            });
+            Object.assign(arcData, {
+                color: uniformArray3(this.arcLength, c.r, c.g, c.b),
+                color2: uniformArray3(this.arcLength, c.r, c.g, c.b)
+            });
+            Object.assign(sectorData, {
+                color: uniformArray3(this.sectorLength, c.r, c.g, c.b)
+            });
         }
         // if (what.sectorOpacity) {
         //   this.sectorBuffer.opacity = what.sectorOpacity
@@ -81327,7 +81293,8 @@ function atomTriplePositions(sview, atomTriple) {
  * Converts triple positions into data required to build various buffers.
  */
 function getAngleData(position, params) {
-    params = params || {};
+    if ( params === void 0 ) params = {};
+
     var angleStep = defaults(params.angleStep, Math.PI / 90);
     var n = position.length / 9;
     var angles = new Float32Array(n);
@@ -81774,7 +81741,7 @@ var AxesRepresentation = (function (StructureRepresentation$$1) {
         this.showBox = defaults(p.showBox, false);
         StructureRepresentation$$1.prototype.init.call(this, p);
     };
-    AxesRepresentation.prototype.getPrincipalAxes = function getPrincipalAxes ( /* sview */) {
+    AxesRepresentation.prototype.getPrincipalAxes = function getPrincipalAxes () {
         var selection;
         var assembly = this.getAssembly();
         if (assembly) {
@@ -81783,7 +81750,7 @@ var AxesRepresentation = (function (StructureRepresentation$$1) {
         return this.structureView.getPrincipalAxes(selection);
     };
     AxesRepresentation.prototype.getAxesData = function getAxesData (sview) {
-        var pa = this.getPrincipalAxes(sview);
+        var pa = this.getPrincipalAxes();
         var c = new Color(this.colorValue);
         var vn = 0;
         var en = 0;
@@ -81899,23 +81866,38 @@ var AxesRepresentation = (function (StructureRepresentation$$1) {
             bufferList: [this.sphereBuffer, this.cylinderBuffer]
         });
     };
+    AxesRepresentation.prototype.createData = function createData (sview) {
+        return;
+    };
     AxesRepresentation.prototype.updateData = function updateData (what, data) {
         var axesData = this.getAxesData(data.sview);
         var sphereData = {};
         var cylinderData = {};
         if (!what || what.position) {
-            sphereData.position = axesData.vertex.position;
-            cylinderData.position1 = axesData.edge.position1;
-            cylinderData.position2 = axesData.edge.position2;
+            Object.assign(sphereData, {
+                position: axesData.vertex.position
+            });
+            Object.assign(cylinderData, {
+                position1: axesData.edge.position1,
+                position2: axesData.edge.position2
+            });
         }
         if (!what || what.color) {
-            sphereData.color = axesData.vertex.color;
-            cylinderData.color = axesData.edge.color;
-            cylinderData.color2 = axesData.edge.color;
+            Object.assign(sphereData, {
+                color: axesData.vertex.color
+            });
+            Object.assign(cylinderData, {
+                color: axesData.edge.color,
+                color2: axesData.edge.color
+            });
         }
         if (!what || what.radius) {
-            sphereData.radius = axesData.vertex.radius;
-            cylinderData.radius = axesData.edge.radius;
+            Object.assign(sphereData, {
+                radius: axesData.vertex.radius
+            });
+            Object.assign(cylinderData, {
+                radius: axesData.edge.radius
+            });
         }
         this.sphereBuffer.setAttributes(sphereData);
         this.cylinderBuffer.setAttributes(cylinderData);
@@ -82073,40 +82055,56 @@ var BallAndStickRepresentation = (function (StructureRepresentation$$1) {
         if (this.lineOnly) {
             var lineData = {};
             if (!what || what.position) {
-                lineData.position1 = bondData.position1;
-                lineData.position2 = bondData.position2;
+                Object.assign(lineData, {
+                    position1: bondData.position1,
+                    position2: bondData.position2
+                });
             }
             if (!what || what.color) {
-                lineData.color = bondData.color;
-                lineData.color2 = bondData.color2;
+                Object.assign(lineData, {
+                    color: bondData.color,
+                    color2: bondData.color2
+                });
             }
             data.bufferList[0].setAttributes(lineData);
         }
         else {
             var cylinderData = {};
             if (!what || what.position) {
-                cylinderData.position1 = bondData.position1;
-                cylinderData.position2 = bondData.position2;
+                Object.assign(cylinderData, {
+                    position1: bondData.position1,
+                    position2: bondData.position2
+                });
             }
             if (!what || what.color) {
-                cylinderData.color = bondData.color;
-                cylinderData.color2 = bondData.color2;
+                Object.assign(cylinderData, {
+                    color: bondData.color,
+                    color2: bondData.color2
+                });
             }
             if (!what || what.radius) {
-                cylinderData.radius = bondData.radius;
+                Object.assign(cylinderData, {
+                    radius: bondData.radius
+                });
             }
             data.bufferList[0].setAttributes(cylinderData);
             if (!this.cylinderOnly) {
                 var atomData = this.getAtomData(data.sview, what);
                 var sphereData = {};
                 if (!what || what.position) {
-                    sphereData.position = atomData.position;
+                    Object.assign(sphereData, {
+                        position: atomData.position
+                    });
                 }
                 if (!what || what.color) {
-                    sphereData.color = atomData.color;
+                    Object.assign(sphereData, {
+                        color: atomData.color
+                    });
                 }
                 if (!what || what.radius) {
-                    sphereData.radius = atomData.radius;
+                    Object.assign(sphereData, {
+                        radius: atomData.radius
+                    });
                 }
                 data.bufferList[1].setAttributes(sphereData);
             }
@@ -82118,7 +82116,7 @@ var BallAndStickRepresentation = (function (StructureRepresentation$$1) {
         var rebuild = false;
         var what = {};
         if (params.aspectRatio || params.bondSpacing || params.bondScale) {
-            what.radius = true;
+            Object.assign(what, { radius: true });
             if (!ExtensionFragDepth || this.disableImpostor) {
                 rebuild = true;
             }
@@ -82223,7 +82221,7 @@ var BaseRepresentation = (function (BallAndStickRepresentation$$1) {
     };
     BaseRepresentation.prototype.getBondData = function getBondData (sview, what, params) {
         var p = this.getBondParams(what, params);
-        p.colorParams.rung = true;
+        Object.assign(p.colorParams, { rung: true });
         return sview.getRungBondData(p);
     };
 
@@ -82236,341 +82234,368 @@ RepresentationRegistry.add('base', BaseRepresentation);
  * @author Alexander Rose <alexander.rose@weirdbyte.de>
  * @private
  */
-function Interpolator(m, tension) {
-    var dt = 1.0 / m;
-    var delta = 0.0001;
-    var vec1 = new Vector3();
-    var vec2 = new Vector3();
-    function interpolateToArr(v0, v1, v2, v3, t, arr, offset) {
-        arr[offset + 0] = spline(v0.x, v1.x, v2.x, v3.x, t, tension);
-        arr[offset + 1] = spline(v0.y, v1.y, v2.y, v3.y, t, tension);
-        arr[offset + 2] = spline(v0.z, v1.z, v2.z, v3.z, t, tension);
+var Interpolator = function Interpolator(m, tension) {
+    this.m = m;
+    this.tension = tension;
+    this.dt = 1.0 / this.m;
+    this.delta = 0.0001;
+    this.vec1 = new Vector3();
+    this.vec2 = new Vector3();
+    this.vDir = new Vector3();
+    this.vTan = new Vector3();
+    this.vNorm = new Vector3();
+    this.vBin = new Vector3();
+    this.m2 = Math.ceil(this.m / 2);
+};
+Interpolator.prototype.interpolateToArr = function interpolateToArr (v0, v1, v2, v3, t, arr, offset) {
+    arr[offset + 0] = spline(v0.x, v1.x, v2.x, v3.x, t, this.tension);
+    arr[offset + 1] = spline(v0.y, v1.y, v2.y, v3.y, t, this.tension);
+    arr[offset + 2] = spline(v0.z, v1.z, v2.z, v3.z, t, this.tension);
+};
+Interpolator.prototype.interpolateToVec = function interpolateToVec (v0, v1, v2, v3, t, vec) {
+    vec.x = spline(v0.x, v1.x, v2.x, v3.x, t, this.tension);
+    vec.y = spline(v0.y, v1.y, v2.y, v3.y, t, this.tension);
+    vec.z = spline(v0.z, v1.z, v2.z, v3.z, t, this.tension);
+};
+Interpolator.prototype.interpolatePosition = function interpolatePosition (v0, v1, v2, v3, pos, offset) {
+        var this$1 = this;
+
+    for (var j = 0; j < this.m; ++j) {
+        var l = offset + j * 3;
+        var d = this$1.dt * j;
+        this$1.interpolateToArr(v0, v1, v2, v3, d, pos, l);
     }
-    function interpolateToVec(v0, v1, v2, v3, t, vec) {
-        vec.x = spline(v0.x, v1.x, v2.x, v3.x, t, tension);
-        vec.y = spline(v0.y, v1.y, v2.y, v3.y, t, tension);
-        vec.z = spline(v0.z, v1.z, v2.z, v3.z, t, tension);
-    }
-    function interpolatePosition(v0, v1, v2, v3, pos, offset) {
-        for (var j = 0; j < m; ++j) {
-            var l = offset + j * 3;
-            var d = dt * j;
-            interpolateToArr(v0, v1, v2, v3, d, pos, l);
-        }
-    }
-    function interpolateTangent(v0, v1, v2, v3, tan, offset) {
-        for (var j = 0; j < m; ++j) {
-            var d = dt * j;
-            var d1 = d - delta;
-            var d2 = d + delta;
-            var l = offset + j * 3;
-            // capping as a precation
-            if (d1 < 0)
-                { d1 = 0; }
-            if (d2 > 1)
-                { d2 = 1; }
-            //
-            interpolateToVec(v0, v1, v2, v3, d1, vec1);
-            interpolateToVec(v0, v1, v2, v3, d2, vec2);
-            //
-            vec2.sub(vec1).normalize();
-            vec2.toArray(tan, l);
-        }
-    }
-    function vectorSubdivide(interpolationFn, iterator, array, offset, isCyclic) {
-        var v0;
-        var v1 = iterator.next();
-        var v2 = iterator.next();
-        var v3 = iterator.next();
+};
+Interpolator.prototype.interpolateTangent = function interpolateTangent (v0, v1, v2, v3, tan, offset) {
+        var this$1 = this;
+
+    for (var j = 0; j < this.m; ++j) {
+        var d = this$1.dt * j;
+        var d1 = d - this$1.delta;
+        var d2 = d + this$1.delta;
+        var l = offset + j * 3;
+        // capping as a precaution
+        if (d1 < 0)
+            { d1 = 0; }
+        if (d2 > 1)
+            { d2 = 1; }
         //
-        var n = iterator.size;
-        var n1 = n - 1;
-        var k = offset || 0;
-        for (var i = 0; i < n1; ++i) {
-            v0 = v1;
-            v1 = v2;
-            v2 = v3;
-            v3 = iterator.next();
-            interpolationFn(v0, v1, v2, v3, array, k);
-            k += 3 * m;
-        }
-        if (isCyclic) {
-            v0 = iterator.get(n - 2);
-            v1 = iterator.get(n - 1);
-            v2 = iterator.get(0);
-            v3 = iterator.get(1);
-            interpolationFn(v0, v1, v2, v3, array, k);
-            k += 3 * m;
-        }
+        this$1.interpolateToVec(v0, v1, v2, v3, d1, this$1.vec1);
+        this$1.interpolateToVec(v0, v1, v2, v3, d2, this$1.vec2);
+        //
+        this$1.vec2.sub(this$1.vec1).normalize();
+        this$1.vec2.toArray(tan, l);
     }
+};
+Interpolator.prototype.vectorSubdivide = function vectorSubdivide (interpolationFn, iterator, array, offset, isCyclic) {
+        var this$1 = this;
+
+    var v0;
+    var v1 = iterator.next();
+    var v2 = iterator.next();
+    var v3 = iterator.next();
     //
-    this.getPosition = function (iterator, array, offset, isCyclic) {
-        iterator.reset();
-        vectorSubdivide(interpolatePosition, iterator, array, offset, isCyclic);
-        var n1 = iterator.size - 1;
-        var k = n1 * m * 3;
-        if (isCyclic)
-            { k += m * 3; }
-        var v = iterator.get(isCyclic ? 0 : n1);
-        array[k] = v.x;
-        array[k + 1] = v.y;
-        array[k + 2] = v.z;
-    };
-    this.getTangent = function (iterator, array, offset, isCyclic) {
-        iterator.reset();
-        vectorSubdivide(interpolateTangent, iterator, array, offset, isCyclic);
-        var n1 = iterator.size - 1;
-        var k = n1 * m * 3;
-        if (isCyclic)
-            { k += m * 3; }
-        copyArray(array, array, k - 3, k, 3);
-    };
+    var n = iterator.size;
+    var n1 = n - 1;
+    var k = offset || 0;
+    for (var i = 0; i < n1; ++i) {
+        v0 = v1;
+        v1 = v2;
+        v2 = v3;
+        v3 = iterator.next();
+        interpolationFn.apply(this$1, [v0, v1, v2, v3, array, k]);
+        k += 3 * this$1.m;
+    }
+    if (isCyclic) {
+        v0 = iterator.get(n - 2);
+        v1 = iterator.get(n - 1);
+        v2 = iterator.get(0);
+        v3 = iterator.get(1);
+        interpolationFn.apply(this, [v0, v1, v2, v3, array, k]);
+        k += 3 * this.m;
+    }
+};
+//
+Interpolator.prototype.getPosition = function getPosition (iterator, array, offset, isCyclic) {
+    iterator.reset();
+    this.vectorSubdivide(this.interpolatePosition, iterator, array, offset, isCyclic);
+    var n1 = iterator.size - 1;
+    var k = n1 * this.m * 3;
+    if (isCyclic)
+        { k += this.m * 3; }
+    var v = iterator.get(isCyclic ? 0 : n1);
+    array[k] = v.x;
+    array[k + 1] = v.y;
+    array[k + 2] = v.z;
+};
+Interpolator.prototype.getTangent = function getTangent (iterator, array, offset, isCyclic) {
+    iterator.reset();
+    this.vectorSubdivide(this.interpolateTangent, iterator, array, offset, isCyclic);
+    var n1 = iterator.size - 1;
+    var k = n1 * this.m * 3;
+    if (isCyclic)
+        { k += this.m * 3; }
+    copyArray(array, array, k - 3, k, 3);
+};
+Interpolator.prototype.interpolateNormalDir = function interpolateNormalDir (u0, u1, u2, u3, v0, v1, v2, v3, tan, norm, bin, offset, shift) {
+        var this$1 = this;
+
+    for (var j = 0; j < this.m; ++j) {
+        var l = offset + j * 3;
+        if (shift)
+            { l += this$1.m2 * 3; }
+        var d = this$1.dt * j;
+        this$1.interpolateToVec(u0, u1, u2, u3, d, this$1.vec1);
+        this$1.interpolateToVec(v0, v1, v2, v3, d, this$1.vec2);
+        this$1.vDir.subVectors(this$1.vec2, this$1.vec1).normalize();
+        this$1.vTan.fromArray(tan, l);
+        this$1.vBin.crossVectors(this$1.vDir, this$1.vTan).normalize();
+        this$1.vBin.toArray(bin, l);
+        this$1.vNorm.crossVectors(this$1.vTan, this$1.vBin).normalize();
+        this$1.vNorm.toArray(norm, l);
+    }
+};
+Interpolator.prototype.interpolateNormal = function interpolateNormal (vDir, tan, norm, bin, offset) {
+        var this$1 = this;
+
+    for (var j = 0; j < this.m; ++j) {
+        var l = offset + j * 3;
+        vDir.copy(this$1.vNorm);
+        this$1.vTan.fromArray(tan, l);
+        this$1.vBin.crossVectors(vDir, this$1.vTan).normalize();
+        this$1.vBin.toArray(bin, l);
+        this$1.vNorm.crossVectors(this$1.vTan, this$1.vBin).normalize();
+        this$1.vNorm.toArray(norm, l);
+    }
+};
+Interpolator.prototype.getNormal = function getNormal (size, tan, norm, bin, offset, isCyclic) {
+        var this$1 = this;
+
+    this.vNorm.set(0, 0, 1);
+    var n = size;
+    var n1 = n - 1;
+    var k = offset || 0;
+    for (var i = 0; i < n1; ++i) {
+        this$1.interpolateNormal(this$1.vDir, tan, norm, bin, k);
+        k += 3 * this$1.m;
+    }
+    if (isCyclic) {
+        this.interpolateNormal(this.vDir, tan, norm, bin, k);
+        k += 3 * this.m;
+    }
+    this.vBin.toArray(bin, k);
+    this.vNorm.toArray(norm, k);
+};
+Interpolator.prototype.getNormalDir = function getNormalDir (iterDir1, iterDir2, tan, norm, bin, offset, isCyclic, shift) {
+        var this$1 = this;
+
+    iterDir1.reset();
+    iterDir2.reset();
     //
-    var vDir = new Vector3();
-    var vTan = new Vector3();
-    var vNorm = new Vector3();
-    var vBin = new Vector3();
-    var m2 = Math.ceil(m / 2);
-    function interpolateNormalDir(u0, u1, u2, u3, v0, v1, v2, v3, tan, norm, bin, offset, shift) {
-        for (var j = 0; j < m; ++j) {
-            var l = offset + j * 3;
-            if (shift)
-                { l += m2 * 3; }
-            var d = dt * j;
-            interpolateToVec(u0, u1, u2, u3, d, vec1);
-            interpolateToVec(v0, v1, v2, v3, d, vec2);
-            vDir.subVectors(vec2, vec1).normalize();
-            vTan.fromArray(tan, l);
-            vBin.crossVectors(vDir, vTan).normalize();
-            vBin.toArray(bin, l);
-            vNorm.crossVectors(vTan, vBin).normalize();
-            vNorm.toArray(norm, l);
-        }
-    }
-    function interpolateNormal(vDir, tan, norm, bin, offset) {
-        for (var j = 0; j < m; ++j) {
-            var l = offset + j * 3;
-            vDir.copy(vNorm);
-            vTan.fromArray(tan, l);
-            vBin.crossVectors(vDir, vTan).normalize();
-            vBin.toArray(bin, l);
-            vNorm.crossVectors(vTan, vBin).normalize();
-            vNorm.toArray(norm, l);
-        }
-    }
-    this.getNormal = function (size, tan, norm, bin, offset, isCyclic) {
-        vNorm.set(0, 0, 1);
-        var n = size;
-        var n1 = n - 1;
-        var k = offset || 0;
-        for (var i = 0; i < n1; ++i) {
-            interpolateNormal(vDir, tan, norm, bin, k);
-            k += 3 * m;
-        }
-        if (isCyclic) {
-            interpolateNormal(vDir, tan, norm, bin, k);
-            k += 3 * m;
-        }
-        vBin.toArray(bin, k);
-        vNorm.toArray(norm, k);
-    };
-    this.getNormalDir = function (iterDir1, iterDir2, tan, norm, bin, offset, isCyclic, shift) {
-        iterDir1.reset();
-        iterDir2.reset();
+    var vSub1 = new Vector3();
+    var vSub2 = new Vector3();
+    var vSub3 = new Vector3();
+    var vSub4 = new Vector3();
+    //
+    var d1v1 = new Vector3();
+    var d1v2 = new Vector3().copy(iterDir1.next());
+    var d1v3 = new Vector3().copy(iterDir1.next());
+    var d1v4 = new Vector3().copy(iterDir1.next());
+    var d2v1 = new Vector3();
+    var d2v2 = new Vector3().copy(iterDir2.next());
+    var d2v3 = new Vector3().copy(iterDir2.next());
+    var d2v4 = new Vector3().copy(iterDir2.next());
+    //
+    this.vNorm.set(0, 0, 1);
+    var n = iterDir1.size;
+    var n1 = n - 1;
+    var k = offset || 0;
+    for (var i = 0; i < n1; ++i) {
+        d1v1.copy(d1v2);
+        d1v2.copy(d1v3);
+        d1v3.copy(d1v4);
+        d1v4.copy(iterDir1.next());
+        d2v1.copy(d2v2);
+        d2v2.copy(d2v3);
+        d2v3.copy(d2v4);
+        d2v4.copy(iterDir2.next());
         //
-        var vSub1 = new Vector3();
-        var vSub2 = new Vector3();
-        var vSub3 = new Vector3();
-        var vSub4 = new Vector3();
-        //
-        var d1v1 = new Vector3();
-        var d1v2 = new Vector3().copy(iterDir1.next());
-        var d1v3 = new Vector3().copy(iterDir1.next());
-        var d1v4 = new Vector3().copy(iterDir1.next());
-        var d2v1 = new Vector3();
-        var d2v2 = new Vector3().copy(iterDir2.next());
-        var d2v3 = new Vector3().copy(iterDir2.next());
-        var d2v4 = new Vector3().copy(iterDir2.next());
-        //
-        vNorm.set(0, 0, 1);
-        var n = iterDir1.size;
-        var n1 = n - 1;
-        var k = offset || 0;
-        for (var i = 0; i < n1; ++i) {
-            d1v1.copy(d1v2);
-            d1v2.copy(d1v3);
-            d1v3.copy(d1v4);
-            d1v4.copy(iterDir1.next());
-            d2v1.copy(d2v2);
-            d2v2.copy(d2v3);
-            d2v3.copy(d2v4);
-            d2v4.copy(iterDir2.next());
-            //
-            if (i === 0) {
-                vSub1.subVectors(d2v1, d1v1);
-                vSub2.subVectors(d2v2, d1v2);
-                if (vSub1.dot(vSub2) < 0) {
-                    vSub2.multiplyScalar(-1);
-                    d2v2.addVectors(d1v2, vSub2);
-                }
-                vSub3.subVectors(d2v3, d1v3);
-                if (vSub2.dot(vSub3) < 0) {
-                    vSub3.multiplyScalar(-1);
-                    d2v3.addVectors(d1v3, vSub3);
-                }
+        if (i === 0) {
+            vSub1.subVectors(d2v1, d1v1);
+            vSub2.subVectors(d2v2, d1v2);
+            if (vSub1.dot(vSub2) < 0) {
+                vSub2.multiplyScalar(-1);
+                d2v2.addVectors(d1v2, vSub2);
             }
-            else {
-                vSub3.copy(vSub4);
-            }
-            vSub4.subVectors(d2v4, d1v4);
-            if (vSub3.dot(vSub4) < 0) {
-                vSub4.multiplyScalar(-1);
-                d2v4.addVectors(d1v4, vSub4);
-            }
-            interpolateNormalDir(d1v1, d1v2, d1v3, d1v4, d2v1, d2v2, d2v3, d2v4, tan, norm, bin, k, shift);
-            k += 3 * m;
-        }
-        if (isCyclic) {
-            d1v1.copy(iterDir1.get(n - 2));
-            d1v2.copy(iterDir1.get(n - 1));
-            d1v3.copy(iterDir1.get(0));
-            d1v4.copy(iterDir1.get(1));
-            d2v1.copy(iterDir2.get(n - 2));
-            d2v2.copy(iterDir2.get(n - 1));
-            d2v3.copy(iterDir2.get(0));
-            d2v4.copy(iterDir2.get(1));
-            //
-            vSub3.copy(vSub4);
-            vSub4.subVectors(d2v4, d1v4);
-            if (vSub3.dot(vSub4) < 0) {
-                vSub4.multiplyScalar(-1);
-                d2v4.addVectors(d1v4, vSub4);
-            }
-            interpolateNormalDir(d1v1, d1v2, d1v3, d1v4, d2v1, d2v2, d2v3, d2v4, tan, norm, bin, k, shift);
-            k += 3 * m;
-        }
-        if (shift) {
-            // FIXME shift requires data from one more preceeding residue
-            vBin.fromArray(bin, m2 * 3);
-            vNorm.fromArray(norm, m2 * 3);
-            for (var j = 0; j < m2; ++j) {
-                vBin.toArray(bin, j * 3);
-                vNorm.toArray(norm, j * 3);
+            vSub3.subVectors(d2v3, d1v3);
+            if (vSub2.dot(vSub3) < 0) {
+                vSub3.multiplyScalar(-1);
+                d2v3.addVectors(d1v3, vSub3);
             }
         }
         else {
-            vBin.toArray(bin, k);
-            vNorm.toArray(norm, k);
+            vSub3.copy(vSub4);
         }
-    };
-    //
-    function interpolateColor(item1, item2, colFn, col, offset) {
-        var j, l;
-        for (j = 0; j < m2; ++j) {
-            l = offset + j * 3;
-            colFn(item1, col, l); // itemColorToArray
+        vSub4.subVectors(d2v4, d1v4);
+        if (vSub3.dot(vSub4) < 0) {
+            vSub4.multiplyScalar(-1);
+            d2v4.addVectors(d1v4, vSub4);
         }
-        for (j = m2; j < m; ++j) {
-            l = offset + j * 3;
-            colFn(item2, col, l); // itemColorToArray
+        this$1.interpolateNormalDir(d1v1, d1v2, d1v3, d1v4, d2v1, d2v2, d2v3, d2v4, tan, norm, bin, k, shift);
+        k += 3 * this$1.m;
+    }
+    if (isCyclic) {
+        d1v1.copy(iterDir1.get(n - 2));
+        d1v2.copy(iterDir1.get(n - 1));
+        d1v3.copy(iterDir1.get(0));
+        d1v4.copy(iterDir1.get(1));
+        d2v1.copy(iterDir2.get(n - 2));
+        d2v2.copy(iterDir2.get(n - 1));
+        d2v3.copy(iterDir2.get(0));
+        d2v4.copy(iterDir2.get(1));
+        //
+        vSub3.copy(vSub4);
+        vSub4.subVectors(d2v4, d1v4);
+        if (vSub3.dot(vSub4) < 0) {
+            vSub4.multiplyScalar(-1);
+            d2v4.addVectors(d1v4, vSub4);
+        }
+        this.interpolateNormalDir(d1v1, d1v2, d1v3, d1v4, d2v1, d2v2, d2v3, d2v4, tan, norm, bin, k, shift);
+        k += 3 * this.m;
+    }
+    if (shift) {
+        // FIXME shift requires data from one this.more preceeding residue
+        this.vBin.fromArray(bin, this.m2 * 3);
+        this.vNorm.fromArray(norm, this.m2 * 3);
+        for (var j = 0; j < this.m2; ++j) {
+            this$1.vBin.toArray(bin, j * 3);
+            this$1.vNorm.toArray(norm, j * 3);
         }
     }
-    this.getColor = function (iterator, colFn, col, offset, isCyclic) {
-        iterator.reset();
-        iterator.next(); // first element not needed
-        var i0;
-        var i1 = iterator.next();
-        //
-        var n = iterator.size;
-        var n1 = n - 1;
-        var k = offset || 0;
-        for (var i = 0; i < n1; ++i) {
-            i0 = i1;
-            i1 = iterator.next();
-            interpolateColor(i0, i1, colFn, col, k);
-            k += 3 * m;
-        }
-        if (isCyclic) {
-            i0 = iterator.get(n - 1);
-            i1 = iterator.get(0);
-            interpolateColor(i0, i1, colFn, col, k);
-            k += 3 * m;
-        }
-        //
-        col[k] = col[k - 3];
-        col[k + 1] = col[k - 2];
-        col[k + 2] = col[k - 1];
-    };
-    //
-    function interpolatePicking(item1, item2, pickFn, pick, offset) {
-        var j;
-        for (j = 0; j < m2; ++j) {
-            pick[offset + j] = pickFn(item1);
-        }
-        for (j = m2; j < m; ++j) {
-            pick[offset + j] = pickFn(item2);
-        }
+    else {
+        this.vBin.toArray(bin, k);
+        this.vNorm.toArray(norm, k);
     }
-    this.getPicking = function (iterator, pickFn, pick, offset, isCyclic) {
-        iterator.reset();
-        iterator.next(); // first element not needed
-        var i0;
-        var i1 = iterator.next();
-        //
-        var n = iterator.size;
-        var n1 = n - 1;
-        var k = offset || 0;
-        for (var i = 0; i < n1; ++i) {
-            i0 = i1;
-            i1 = iterator.next();
-            interpolatePicking(i0, i1, pickFn, pick, k);
-            k += m;
-        }
-        if (isCyclic) {
-            i0 = iterator.get(n - 1);
-            i1 = iterator.get(0);
-            interpolatePicking(i0, i1, pickFn, pick, k);
-            k += m;
-        }
-        //
-        pick[k] = pick[k - 1];
-    };
-    //
-    function interpolateSize(item1, item2, sizeFn, size, offset) {
-        var s1 = sizeFn(item1);
-        var s2 = sizeFn(item2);
-        for (var j = 0; j < m; ++j) {
-            // linear interpolation
-            var t = j / m;
-            size[offset + j] = (1 - t) * s1 + t * s2;
-        }
+};
+//
+Interpolator.prototype.interpolateColor = function interpolateColor (item1, item2, colFn, col, offset) {
+        var this$1 = this;
+
+    var j, l;
+    for (j = 0; j < this.m2; ++j) {
+        l = offset + j * 3;
+        colFn.apply(this$1, [item1, col, l]); // itemColorToArray
     }
-    this.getSize = function (iterator, sizeFn, size, offset, isCyclic) {
-        iterator.reset();
-        iterator.next(); // first element not needed
-        var i0;
-        var i1 = iterator.next();
-        //
-        var n = iterator.size;
-        var n1 = n - 1;
-        var k = offset || 0;
-        for (var i = 0; i < n1; ++i) {
-            i0 = i1;
-            i1 = iterator.next();
-            interpolateSize(i0, i1, sizeFn, size, k);
-            k += m;
-        }
-        if (isCyclic) {
-            i0 = iterator.get(n - 1);
-            i1 = iterator.get(0);
-            interpolateSize(i0, i1, sizeFn, size, k);
-            k += m;
-        }
-        //
-        size[k] = size[k - 1];
-    };
-}
-function Spline$1(polymer, params) {
+    for (j = this.m2; j < this.m; ++j) {
+        l = offset + j * 3;
+        colFn.apply(this$1, [item2, col, l]); // itemColorToArray
+    }
+};
+Interpolator.prototype.getColor = function getColor (iterator, colFn, col, offset, isCyclic) {
+        var this$1 = this;
+
+    iterator.reset();
+    iterator.next(); // first element not needed
+    var i0;
+    var i1 = iterator.next();
+    //
+    var n = iterator.size;
+    var n1 = n - 1;
+    var k = offset || 0;
+    for (var i = 0; i < n1; ++i) {
+        i0 = i1;
+        i1 = iterator.next();
+        this$1.interpolateColor(i0, i1, colFn, col, k);
+        k += 3 * this$1.m;
+    }
+    if (isCyclic) {
+        i0 = iterator.get(n - 1);
+        i1 = iterator.get(0);
+        this.interpolateColor(i0, i1, colFn, col, k);
+        k += 3 * this.m;
+    }
+    //
+    col[k] = col[k - 3];
+    col[k + 1] = col[k - 2];
+    col[k + 2] = col[k - 1];
+};
+//
+Interpolator.prototype.interpolatePicking = function interpolatePicking (item1, item2, pickFn, pick, offset) {
+        var this$1 = this;
+
+    var j;
+    for (j = 0; j < this.m2; ++j) {
+        pick[offset + j] = pickFn.apply(this$1, [item1]);
+    }
+    for (j = this.m2; j < this.m; ++j) {
+        pick[offset + j] = pickFn.apply(this$1, [item2]);
+    }
+};
+Interpolator.prototype.getPicking = function getPicking (iterator, pickFn, pick, offset, isCyclic) {
+        var this$1 = this;
+
+    iterator.reset();
+    iterator.next(); // first element not needed
+    var i0;
+    var i1 = iterator.next();
+    //
+    var n = iterator.size;
+    var n1 = n - 1;
+    var k = offset || 0;
+    for (var i = 0; i < n1; ++i) {
+        i0 = i1;
+        i1 = iterator.next();
+        this$1.interpolatePicking(i0, i1, pickFn, pick, k);
+        k += this$1.m;
+    }
+    if (isCyclic) {
+        i0 = iterator.get(n - 1);
+        i1 = iterator.get(0);
+        this.interpolatePicking(i0, i1, pickFn, pick, k);
+        k += this.m;
+    }
+    //
+    pick[k] = pick[k - 1];
+};
+//
+Interpolator.prototype.interpolateSize = function interpolateSize (item1, item2, sizeFn, size, offset) {
+        var this$1 = this;
+
+    var s1 = sizeFn.apply(this, [item1]);
+    var s2 = sizeFn.apply(this, [item2]);
+    for (var j = 0; j < this.m; ++j) {
+        // linear interpolation
+        var t = j / this$1.m;
+        size[offset + j] = (1 - t) * s1 + t * s2;
+    }
+};
+Interpolator.prototype.getSize = function getSize (iterator, sizeFn, size, offset, isCyclic) {
+        var this$1 = this;
+
+    iterator.reset();
+    iterator.next(); // first element not needed
+    var i0;
+    var i1 = iterator.next();
+    //
+    var n = iterator.size;
+    var n1 = n - 1;
+    var k = offset || 0;
+    for (var i = 0; i < n1; ++i) {
+        i0 = i1;
+        i1 = iterator.next();
+        this$1.interpolateSize(i0, i1, sizeFn, size, k);
+        k += this$1.m;
+    }
+    if (isCyclic) {
+        i0 = iterator.get(n - 1);
+        i1 = iterator.get(0);
+        this.interpolateSize(i0, i1, sizeFn, size, k);
+        k += this.m;
+    }
+    //
+    size[k] = size[k - 1];
+};
+var Spline$1 = function Spline$$1(polymer, params) {
     this.polymer = polymer;
     this.size = polymer.residueCount;
     var p = params || {};
@@ -82585,185 +82610,182 @@ function Spline$1(polymer, params) {
         this.tension = p.tension;
     }
     this.interpolator = new Interpolator(this.subdiv, this.tension);
-}
-Spline$1.prototype = {
-    constructor: Spline$1,
-    getAtomIterator: function (type, smooth) {
-        var polymer = this.polymer;
-        var structure = polymer.structure;
-        var n = polymer.residueCount;
-        var i = 0;
-        var j = -1;
-        var cache = [
-            structure.getAtomProxy(),
-            structure.getAtomProxy(),
-            structure.getAtomProxy(),
-            structure.getAtomProxy()
-        ];
-        var cache2 = [
-            new Vector3(),
-            new Vector3(),
-            new Vector3(),
-            new Vector3()
-        ];
-        function next() {
-            var atomProxy = this.get(j);
-            j += 1;
-            return atomProxy;
-        }
-        var apPrev = structure.getAtomProxy();
-        var apNext = structure.getAtomProxy();
-        function get(idx) {
-            var atomProxy = cache[i % 4];
-            atomProxy.index = polymer.getAtomIndexByType(idx, type);
-            if (smooth && idx > 0 && idx < n && atomProxy.sstruc === 'e') {
-                var vec = cache2[i % 4];
-                apPrev.index = polymer.getAtomIndexByType(idx + 1, type);
-                apNext.index = polymer.getAtomIndexByType(idx - 1, type);
-                vec.addVectors(apPrev, apNext)
-                    .add(atomProxy).add(atomProxy)
-                    .multiplyScalar(0.25);
-                i += 1;
-                return vec;
-            }
-            i += 1;
-            return atomProxy;
-        }
-        function reset() {
-            i = 0;
-            j = -1;
-        }
-        return {
-            size: n,
-            next: next,
-            get: get,
-            reset: reset
-        };
-    },
-    getSubdividedColor: function (params) {
-        var m = this.subdiv;
-        var polymer = this.polymer;
-        var n = polymer.residueCount;
-        var n1 = n - 1;
-        var nCol = n1 * m * 3 + 3;
-        if (polymer.isCyclic)
-            { nCol += m * 3; }
-        var col = new Float32Array(nCol);
-        var iterator = this.getAtomIterator('trace');
-        var p = params || {};
-        p.structure = polymer.structure;
-        var colormaker = ColormakerRegistry$1.getScheme(p);
-        function colFn(item, array, offset) {
-            colormaker.atomColorToArray(item, array, offset);
-        }
-        this.interpolator.getColor(iterator, colFn, col, 0, polymer.isCyclic);
-        return {
-            'color': col
-        };
-    },
-    getSubdividedPicking: function () {
-        var m = this.subdiv;
-        var polymer = this.polymer;
-        var n = polymer.residueCount;
-        var n1 = n - 1;
-        var nCol = n1 * m + 1;
-        if (polymer.isCyclic)
-            { nCol += m; }
-        var structure = polymer.structure;
-        var iterator = this.getAtomIterator('trace');
-        var pick = new Float32Array(nCol);
-        function pickFn(item) {
-            return item.index;
-        }
-        this.interpolator.getPicking(iterator, pickFn, pick, 0, polymer.isCyclic);
-        return {
-            'picking': new AtomPicker(pick, structure)
-        };
-    },
-    getSubdividedPosition: function () {
-        var pos = this.getPosition();
-        return {
-            'position': pos
-        };
-    },
-    getSubdividedOrientation: function () {
-        var tan = this.getTangent();
-        var normals = this.getNormals(tan);
-        return {
-            'tangent': tan,
-            'normal': normals.normal,
-            'binormal': normals.binormal
-        };
-    },
-    getSubdividedSize: function (params) {
-        var m = this.subdiv;
-        var polymer = this.polymer;
-        var n = polymer.residueCount;
-        var n1 = n - 1;
-        var nSize = n1 * m + 1;
-        if (polymer.isCyclic)
-            { nSize += m; }
-        var size = new Float32Array(nSize);
-        var iterator = this.getAtomIterator('trace');
-        var radiusFactory = new RadiusFactory(params);
-        function sizeFn(item) {
-            return radiusFactory.atomRadius(item);
-        }
-        this.interpolator.getSize(iterator, sizeFn, size, 0, polymer.isCyclic);
-        return {
-            'size': size
-        };
-    },
-    getPosition: function () {
-        var m = this.subdiv;
-        var polymer = this.polymer;
-        var n = polymer.residueCount;
-        var n1 = n - 1;
-        var nPos = n1 * m * 3 + 3;
-        if (polymer.isCyclic)
-            { nPos += m * 3; }
-        var pos = new Float32Array(nPos);
-        var iterator = this.positionIterator || this.getAtomIterator('trace', this.smoothSheet);
-        this.interpolator.getPosition(iterator, pos, 0, polymer.isCyclic);
-        return pos;
-    },
-    getTangent: function () {
-        var m = this.subdiv;
-        var polymer = this.polymer;
-        var n = this.size;
-        var n1 = n - 1;
-        var nTan = n1 * m * 3 + 3;
-        if (polymer.isCyclic)
-            { nTan += m * 3; }
-        var tan = new Float32Array(nTan);
-        var iterator = this.positionIterator || this.getAtomIterator('trace', this.smoothSheet);
-        this.interpolator.getTangent(iterator, tan, 0, polymer.isCyclic);
-        return tan;
-    },
-    getNormals: function (tan) {
-        var m = this.subdiv;
-        var polymer = this.polymer;
-        var isProtein = polymer.isProtein();
-        var n = this.size;
-        var n1 = n - 1;
-        var nNorm = n1 * m * 3 + 3;
-        if (polymer.isCyclic)
-            { nNorm += m * 3; }
-        var norm = new Float32Array(nNorm);
-        var bin = new Float32Array(nNorm);
-        if (this.directional && !this.polymer.isCg()) {
-            var iterDir1 = this.getAtomIterator('direction1');
-            var iterDir2 = this.getAtomIterator('direction2');
-            this.interpolator.getNormalDir(iterDir1, iterDir2, tan, norm, bin, 0, polymer.isCyclic, isProtein);
-        }
-        else {
-            this.interpolator.getNormal(n, tan, norm, bin, 0, polymer.isCyclic, isProtein);
-        }
-        return {
-            'normal': norm,
-            'binormal': bin
-        };
+};
+Spline$1.prototype.getAtomIterator = function getAtomIterator (type, smooth) {
+    var polymer = this.polymer;
+    var structure = polymer.structure;
+    var n = polymer.residueCount;
+    var i = 0;
+    var j = -1;
+    var cache = [
+        structure.getAtomProxy(),
+        structure.getAtomProxy(),
+        structure.getAtomProxy(),
+        structure.getAtomProxy()
+    ];
+    var cache2 = [
+        new Vector3(),
+        new Vector3(),
+        new Vector3(),
+        new Vector3()
+    ];
+    function next() {
+        var atomProxy = get(j);
+        j += 1;
+        return atomProxy;
     }
+    var apPrev = structure.getAtomProxy();
+    var apNext = structure.getAtomProxy();
+    function get(idx) {
+        var atomProxy = cache[i % 4];
+        atomProxy.index = polymer.getAtomIndexByType(idx, type);
+        if (smooth && idx > 0 && idx < n && atomProxy.sstruc === 'e') {
+            var vec = cache2[i % 4];
+            apPrev.index = polymer.getAtomIndexByType(idx + 1, type);
+            apNext.index = polymer.getAtomIndexByType(idx - 1, type);
+            vec.addVectors(apPrev, apNext)
+                .add(atomProxy).add(atomProxy)
+                .multiplyScalar(0.25);
+            i += 1;
+            return vec;
+        }
+        i += 1;
+        return atomProxy;
+    }
+    function reset() {
+        i = 0;
+        j = -1;
+    }
+    return {
+        size: n,
+        next: next,
+        get: get,
+        reset: reset
+    };
+};
+Spline$1.prototype.getSubdividedColor = function getSubdividedColor (params) {
+    var m = this.subdiv;
+    var polymer = this.polymer;
+    var n = polymer.residueCount;
+    var n1 = n - 1;
+    var nCol = n1 * m * 3 + 3;
+    if (polymer.isCyclic)
+        { nCol += m * 3; }
+    var col = new Float32Array(nCol);
+    var iterator = this.getAtomIterator('trace');
+    var p = params || {};
+    p.structure = polymer.structure;
+    var colormaker = ColormakerRegistry$1.getScheme(p);
+    function colFn(item, array, offset) {
+        colormaker.atomColorToArray(item, array, offset);
+    }
+    this.interpolator.getColor(iterator, colFn, col, 0, polymer.isCyclic);
+    return {
+        'color': col
+    };
+};
+Spline$1.prototype.getSubdividedPicking = function getSubdividedPicking () {
+    var m = this.subdiv;
+    var polymer = this.polymer;
+    var n = polymer.residueCount;
+    var n1 = n - 1;
+    var nCol = n1 * m + 1;
+    if (polymer.isCyclic)
+        { nCol += m; }
+    var structure = polymer.structure;
+    var iterator = this.getAtomIterator('trace');
+    var pick = new Float32Array(nCol);
+    function pickFn(item) {
+        return item.index;
+    }
+    this.interpolator.getPicking(iterator, pickFn, pick, 0, polymer.isCyclic);
+    return {
+        'picking': new AtomPicker(pick, structure)
+    };
+};
+Spline$1.prototype.getSubdividedPosition = function getSubdividedPosition () {
+    var pos = this.getPosition();
+    return {
+        'position': pos
+    };
+};
+Spline$1.prototype.getSubdividedOrientation = function getSubdividedOrientation () {
+    var tan = this.getTangent();
+    var normals = this.getNormals(tan);
+    return {
+        'tangent': tan,
+        'normal': normals.normal,
+        'binormal': normals.binormal
+    };
+};
+Spline$1.prototype.getSubdividedSize = function getSubdividedSize (params) {
+    var m = this.subdiv;
+    var polymer = this.polymer;
+    var n = polymer.residueCount;
+    var n1 = n - 1;
+    var nSize = n1 * m + 1;
+    if (polymer.isCyclic)
+        { nSize += m; }
+    var size = new Float32Array(nSize);
+    var iterator = this.getAtomIterator('trace');
+    var radiusFactory = new RadiusFactory(params);
+    function sizeFn(item) {
+        return radiusFactory.atomRadius(item);
+    }
+    this.interpolator.getSize(iterator, sizeFn, size, 0, polymer.isCyclic);
+    return {
+        'size': size
+    };
+};
+Spline$1.prototype.getPosition = function getPosition () {
+    var m = this.subdiv;
+    var polymer = this.polymer;
+    var n = polymer.residueCount;
+    var n1 = n - 1;
+    var nPos = n1 * m * 3 + 3;
+    if (polymer.isCyclic)
+        { nPos += m * 3; }
+    var pos = new Float32Array(nPos);
+    var iterator = this.positionIterator || this.getAtomIterator('trace', this.smoothSheet);
+    this.interpolator.getPosition(iterator, pos, 0, polymer.isCyclic);
+    return pos;
+};
+Spline$1.prototype.getTangent = function getTangent () {
+    var m = this.subdiv;
+    var polymer = this.polymer;
+    var n = this.size;
+    var n1 = n - 1;
+    var nTan = n1 * m * 3 + 3;
+    if (polymer.isCyclic)
+        { nTan += m * 3; }
+    var tan = new Float32Array(nTan);
+    var iterator = this.positionIterator || this.getAtomIterator('trace', this.smoothSheet);
+    this.interpolator.getTangent(iterator, tan, 0, polymer.isCyclic);
+    return tan;
+};
+Spline$1.prototype.getNormals = function getNormals (tan) {
+    var m = this.subdiv;
+    var polymer = this.polymer;
+    var isProtein = polymer.isProtein();
+    var n = this.size;
+    var n1 = n - 1;
+    var nNorm = n1 * m * 3 + 3;
+    if (polymer.isCyclic)
+        { nNorm += m * 3; }
+    var norm = new Float32Array(nNorm);
+    var bin = new Float32Array(nNorm);
+    if (this.directional && !this.polymer.isCg()) {
+        var iterDir1 = this.getAtomIterator('direction1');
+        var iterDir2 = this.getAtomIterator('direction2');
+        this.interpolator.getNormalDir(iterDir1, iterDir2, tan, norm, bin, 0, polymer.isCyclic, isProtein);
+    }
+    else {
+        this.interpolator.getNormal(n, tan, norm, bin, 0, polymer.isCyclic);
+    }
+    return {
+        'normal': norm,
+        'binormal': bin
+    };
 };
 
 /**
@@ -83170,7 +83192,7 @@ var CartoonRepresentation = (function (StructureRepresentation$$1) {
             var polymer = data.polymerList[i];
             var spline = this$1.getSpline(polymer);
             var aspectRatio = this$1.getAspectRatio(polymer);
-            data.bufferList[i].aspectRatio = aspectRatio;
+            Object.assign(data.bufferList[i], { aspectRatio: aspectRatio });
             if (what.position || what.radius) {
                 var subPos = spline.getSubdividedPosition();
                 var subOri = spline.getSubdividedOrientation();
@@ -83423,21 +83445,6 @@ RepresentationRegistry.add('contact', ContactRepresentation);
  * @private
  */
 /**
- * @typedef {Object} DihedralRepresentationParameters - dihedral representation parameters
- * @mixes RepresentationParameters
- * @mixes StructureRepresentationParameters
- * @mixes MeasurementRepresentationParameters
- *
- * @property {String} atomQuad - list of quadruplets of selection strings
- *                               or atom indices
- * @property {Boolean} extendLine - Extend lines in planes
- * @property {Number} lineOpacity - Opacity for the line part of the representation
- * @property {Boolean} lineVisible - Display the line part of the representation
- * @property {Number} linewidth - width for line part of representation
- * @property {Boolean} planeVisible - Display the two planes corresponding to dihedral
- * @property {Boolean} sectorVisible - Display the filled arc for each angle
- */
-/**
  * Dihedral representation object
  *
  * Reperesentation consists of three parts, visibility can be set for each
@@ -83545,9 +83552,16 @@ var DihedralRepresentation = (function (MeasurementRepresentation$$1) {
         var sectorData = {};
         if (what.color) {
             var c = new Color(this.colorValue);
-            lineData.color = lineData.color2 = uniformArray3(this.lineLength, c.r, c.g, c.b);
-            planeData.color = uniformArray3(this.planeLength, c.r, c.g, c.b);
-            sectorData.color = uniformArray3(this.sectorLength, c.r, c.g, c.b);
+            Object.assign(lineData, {
+                color: uniformArray3(this.lineLength, c.r, c.g, c.b),
+                color2: uniformArray3(this.lineLength, c.r, c.g, c.b)
+            });
+            Object.assign(planeData, {
+                color: uniformArray3(this.planeLength, c.r, c.g, c.b)
+            });
+            Object.assign(sectorData, {
+                color: uniformArray3(this.sectorLength, c.r, c.g, c.b)
+            });
         }
         this.lineBuffer.setAttributes(lineData);
         this.planeBuffer.setAttributes(planeData);
@@ -83597,7 +83611,8 @@ var DihedralRepresentation = (function (MeasurementRepresentation$$1) {
  * @return {Object}              Arrays for building buffers
  */
 function getDihedralData(position, params) {
-    params = params || {};
+    if ( params === void 0 ) params = {};
+
     var angleStep = defaults(params.angleStep, Math.PI / 90);
     var nPos = position.length;
     var n = position.length / 12;
@@ -83818,22 +83833,6 @@ RepresentationRegistry.add('dihedral', DihedralRepresentation);
  * @private
  */
 /**
- * Distance representation parameter object.
- * @typedef {Object} DistanceRepresentationParameters - distance representation parameters
- * @mixes RepresentationParameters
- * @mixes StructureRepresentationParameters
- * @mixes MeasurementRepresentationParameters
- *
- * @property {String} labelUnit - distance unit (e.g. "angstrom" or "nm"). If set, a distance
- *                                symbol is appended to the label (i.e. 'nm' or '\u00C5'). In case of 'nm', the
- *                                distance value is computed in nanometers instead of Angstroms.
- * @property {Array[]} atomPair - list of pairs of selection strings (see {@link Selection})
- *                                or pairs of atom indices. Using atom indices is much more
- *                                when the representation is updated often, e.g. by
- *                                changing the selection or the atom positions, as their
- *                                are no selection strings to be evaluated.
- */
-/**
  * Distance representation
  */
 var DistanceRepresentation = (function (MeasurementRepresentation$$1) {
@@ -83873,6 +83872,8 @@ var DistanceRepresentation = (function (MeasurementRepresentation$$1) {
         MeasurementRepresentation$$1.prototype.init.call(this, p);
     };
     DistanceRepresentation.prototype.getDistanceData = function getDistanceData (sview, atomPair) {
+        var this$1 = this;
+
         var n = atomPair.length;
         var text = new Array(n);
         var position = new Float32Array(n * 3);
@@ -83886,7 +83887,7 @@ var DistanceRepresentation = (function (MeasurementRepresentation$$1) {
         atomPair.forEach(function (pair, i) {
             var v1 = pair[0];
             var v2 = pair[1];
-            if (Number.isInteger(v1) && Number.isInteger(v2)) {
+            if (typeof (v1) === 'number' && Number.isInteger(v1) && typeof (v2) === 'number' && Number.isInteger(v2)) {
                 if (selected.get(v1) && selected.get(v2)) {
                     ap1.index = v1;
                     ap2.index = v2;
@@ -83913,7 +83914,7 @@ var DistanceRepresentation = (function (MeasurementRepresentation$$1) {
             bondStore.addBond(ap1, ap2, 1);
             i -= j;
             var d = ap1.distanceTo(ap2);
-            switch (this.labelUnit) {
+            switch (this$1.labelUnit) {
                 case 'angstrom':
                     text[i] = d.toFixed(2) + ' ' + String.fromCharCode(0x212B);
                     break;
@@ -83928,7 +83929,7 @@ var DistanceRepresentation = (function (MeasurementRepresentation$$1) {
             position[i3 + 0] = (ap1.x + ap2.x) / 2;
             position[i3 + 1] = (ap1.y + ap2.y) / 2;
             position[i3 + 2] = (ap1.z + ap2.z) / 2;
-        }, this);
+        });
         if (j > 0) {
             n -= j;
             position = position.subarray(0, n * 3);
@@ -83996,11 +83997,13 @@ var DistanceRepresentation = (function (MeasurementRepresentation$$1) {
         var bondData = this.getBondData(data.sview, what, bondParams);
         var distanceData = {};
         if (!what || what.color) {
-            distanceData.color = bondData.color;
-            distanceData.color2 = bondData.color2;
+            Object.assign(distanceData, {
+                color: bondData.color,
+                color2: bondData.color2
+            });
         }
         if (!what || what.radius) {
-            distanceData.radius = bondData.radius;
+            Object.assign(distanceData, { radius: bondData.radius });
         }
         this.distanceBuffer.setAttributes(distanceData);
     };
@@ -84182,7 +84185,7 @@ var HelixorientRepresentation = (function (StructureRepresentation$$1) {
             var helixorient = new Helixorient(polymer);
             if (what.position) {
                 var position = helixorient.getPosition();
-                bufferData.position = position.center;
+                Object.assign(bufferData, { position: position.center });
                 data.bufferList[j + 1].setAttributes({
                     'position': position.center,
                     'vector': position.axis
@@ -84450,22 +84453,28 @@ var HyperballRepresentation = (function (LicoriceRepresentation$$1) {
         var sphereData = {};
         var stickData = {};
         if (!what || what.position) {
-            sphereData.position = atomData.position;
+            Object.assign(sphereData, { position: atomData.position });
             var from = bondData.position1;
             var to = bondData.position2;
-            stickData.position = calculateCenterArray(from, to, this.__center);
-            stickData.position1 = from;
-            stickData.position2 = to;
+            Object.assign(stickData, {
+                position: calculateCenterArray(from, to, this.__center),
+                position1: from,
+                position2: to
+            });
         }
         if (!what || what.color) {
-            sphereData.color = atomData.color;
-            stickData.color = bondData.color;
-            stickData.color2 = bondData.color2;
+            Object.assign(sphereData, { color: atomData.color });
+            Object.assign(stickData, {
+                color: bondData.color,
+                color2: bondData.color2
+            });
         }
         if (!what || what.radius) {
-            sphereData.radius = atomData.radius;
-            stickData.radius = bondData.radius;
-            stickData.radius2 = bondData.radius2;
+            Object.assign(sphereData, { radius: atomData.radius });
+            Object.assign(stickData, {
+                radius: bondData.radius,
+                radius2: bondData.radius2
+            });
         }
         data.bufferList[0].setAttributes(sphereData);
         data.bufferList[1].setAttributes(stickData);
@@ -84567,45 +84576,6 @@ LabelFactory.types = LabelFactoryTypes;
  * @file Label Representation
  * @author Alexander Rose <alexander.rose@weirdbyte.de>
  * @private
- */
-/**
- * Label representation parameter object. Extends {@link RepresentationParameters} and
- * {@link StructureRepresentationParameters}.
- *
- * @typedef {Object} LabelRepresentationParameters - label representation parameters
- *
- * @property {Integer} clipNear - position of camera near/front clipping plane
- *                                in percent of scene bounding box
- * @property {Float} opacity - translucency: 1 is fully opaque, 0 is fully transparent
- * @property {String} labelType - type of the label, one of:
- *                                 "atomname", "atomindex", "occupancy", "bfactor",
- *                                 "serial", "element", "atom", "resname", "resno",
- *                                 "res", "text", "qualified". When set to "text", the
- *                                 `labelText` list is used.
- * @property {String[]} labelText - list of label strings, must set `labelType` to "text"
- *                                   to take effect
- * @property {String[]} labelFormat - sprintf-js format string, any attribute of
- *                                  {@link  AtomProxy} can be used
- * @property {String} labelGrouping - grouping of the label, one of:
- *                                 "atom", "residue".
- * @property {String} fontFamily - font family, one of: "sans-serif", "monospace", "serif"
- * @property {String} fontStyle - font style, "normal" or "italic"
- * @property {String} fontWeight - font weight, "normal" or "bold"
- * @property {Float} xOffset - offset in x-direction
- * @property {Float} yOffset - offset in y-direction
- * @property {Float} zOffset - offset in z-direction (i.e. in camera direction)
- * @property {String} attachment - attachment of the label, one of:
- *                                 "bottom-left", "bottom-center", "bottom-right",
- *                                 "middle-left", "middle-center", "middle-right",
- *                                 "top-left", "top-center", "top-right"
- * @property {Boolean} showBorder - show border/outline
- * @property {Color} borderColor - color of the border/outline
- * @property {Float} borderWidth - width of the border/outline
- * @property {Boolean} showBackground - show background rectangle
- * @property {Color} backgroundColor - color of the background
- * @property {Float} backgroundMargin - width of the background
- * @property {Float} backgroundOpacity - opacity of the background
- * @property {Boolean} fixedSize - show text with a fixed pixel size
  */
 /**
  * Label representation
@@ -84746,7 +84716,7 @@ var LabelRepresentation = (function (StructureRepresentation$$1) {
     LabelRepresentation.prototype.getTextData = function getTextData (sview, what) {
         var p = this.getAtomParams(what);
         var labelFactory = new LabelFactory(this.labelType, this.labelText, this.labelFormat);
-        var position, size, color, text;
+        var position, size, color, text, positionN, sizeN, colorN;
         if (this.labelGrouping === 'atom') {
             var atomData = sview.getAtomData(p);
             position = atomData.position;
@@ -84759,11 +84729,11 @@ var LabelRepresentation = (function (StructureRepresentation$$1) {
         }
         else if (this.labelGrouping === 'residue') {
             if (!what || what.position)
-                { position = []; }
+                { positionN = []; }
             if (!what || what.color)
-                { color = []; }
+                { colorN = []; }
             if (!what || what.radius)
-                { size = []; }
+                { sizeN = []; }
             if (!what || what.text)
                 { text = []; }
             if (p.colorParams)
@@ -84777,20 +84747,20 @@ var LabelRepresentation = (function (StructureRepresentation$$1) {
                 if (rp.isProtein() || rp.isNucleic()) {
                     ap1.index = rp.traceAtomIndex;
                     if (!what || what.position) {
-                        ap1.positionToArray(position, i3);
+                        ap1.positionToArray(positionN, i3);
                     }
                 }
                 else {
                     ap1.index = rp.atomOffset;
                     if (!what || what.position) {
-                        rp.positionToArray(position, i3);
+                        rp.positionToArray(positionN, i3);
                     }
                 }
                 if (!what || what.color) {
-                    colormaker.atomColorToArray(ap1, color, i3);
+                    colormaker.atomColorToArray(ap1, colorN, i3);
                 }
                 if (!what || what.radius) {
-                    size[i] = radiusFactory.atomRadius(ap1);
+                    sizeN[i] = radiusFactory.atomRadius(ap1);
                 }
                 if (!what || what.text) {
                     text.push(labelFactory.atomLabel(ap1));
@@ -84798,11 +84768,11 @@ var LabelRepresentation = (function (StructureRepresentation$$1) {
                 ++i;
             });
             if (!what || what.position)
-                { position = new Float32Array(position); }
+                { position = new Float32Array(positionN); }
             if (!what || what.color)
-                { color = new Float32Array(color); }
+                { color = new Float32Array(colorN); }
             if (!what || what.radius)
-                { size = new Float32Array(size); }
+                { size = new Float32Array(sizeN); }
         }
         return { position: position, size: size, color: color, text: text };
     };
@@ -84942,7 +84912,7 @@ var LineRepresentation = (function (StructureRepresentation$$1) {
         }
         var p = {};
         if (this.crosses === 'lone') {
-            p.atomSet = getLoneAtomSet(sview);
+            Object.assign(p, { atomSet: getLoneAtomSet(sview) });
         }
         var atomData = sview.getAtomData(this.getAtomParams(what, p));
         var crossData = {};
@@ -84951,12 +84921,12 @@ var LineRepresentation = (function (StructureRepresentation$$1) {
         var picking = atomData.picking;
         var size = (position || color).length;
         var attrSize = size * 3;
-        var cPosition1;
-        var cPosition2;
-        var cColor;
-        var cColor2;
+        var cPosition1 = new Float32Array(0);
+        var cPosition2 = new Float32Array(0);
+        var cColor = new Float32Array(0);
+        var cColor2 = new Float32Array(0);
         var cOffset;
-        var pickingArray;
+        var pickingArray = new Float32Array(0);
         if (!what || what.position) {
             cPosition1 = crossData.position1 = new Float32Array(attrSize);
             cPosition2 = crossData.position2 = new Float32Array(attrSize);
@@ -85010,7 +84980,7 @@ var LineRepresentation = (function (StructureRepresentation$$1) {
             }
         }
         if (!what || what.picking) {
-            crossData.picking = new AtomPicker(pickingArray, atomData.picking.structure);
+            crossData.picking = new AtomPicker(pickingArray, picking.structure);
         }
         return crossData;
     };
@@ -85036,12 +85006,16 @@ var LineRepresentation = (function (StructureRepresentation$$1) {
             var bondData = data.sview.getBondData(this.getBondParams(what));
             var lineAttributes = {};
             if (!what || what.position) {
-                lineAttributes.position1 = bondData.position1;
-                lineAttributes.position2 = bondData.position2;
+                Object.assign(lineAttributes, {
+                    position1: bondData.position1,
+                    position2: bondData.position2
+                });
             }
             if (!what || what.color) {
-                lineAttributes.color = bondData.color;
-                lineAttributes.color2 = bondData.color2;
+                Object.assign(lineAttributes, {
+                    color: bondData.color,
+                    color2: bondData.color2
+                });
             }
             data.bufferList[bufferIdx++].setAttributes(lineAttributes);
         }
@@ -85049,12 +85023,16 @@ var LineRepresentation = (function (StructureRepresentation$$1) {
             var crossData = this._crossData(what, data.sview);
             var crossAttributes = {};
             if (!what || what.position) {
-                crossAttributes.position1 = crossData.position1;
-                crossAttributes.position2 = crossData.position2;
+                Object.assign(crossAttributes, {
+                    position1: crossData.position1,
+                    position2: crossData.position2
+                });
             }
             if (!what || what.color) {
-                crossAttributes.color = crossData.color;
-                crossAttributes.color2 = crossData.color2;
+                Object.assign(crossAttributes, {
+                    color: crossData.color,
+                    color2: crossData.color2
+                });
             }
             data.bufferList[bufferIdx++].setAttributes(crossAttributes);
         }
@@ -85063,7 +85041,7 @@ var LineRepresentation = (function (StructureRepresentation$$1) {
         var rebuild = false;
         var what = {};
         if (params && (params.bondSpacing || params.crossSize)) {
-            what.position = true;
+            Object.assign(what, { position: true });
         }
         StructureRepresentation$$1.prototype.setParameters.call(this, params, what, rebuild);
         return this;
@@ -85078,48 +85056,57 @@ RepresentationRegistry.add('line', LineRepresentation);
  * @author Alexander Rose <alexander.rose@weirdbyte.de>
  * @private
  */
-function Grid(length, width, height, DataCtor, elemSize) {
-    DataCtor = DataCtor || Int32Array;
-    elemSize = elemSize || 1;
-    var data = new DataCtor(length * width * height * elemSize);
-    function index(x, y, z) {
-        return ((((x * width) + y) * height) + z) * elemSize;
-    }
-    this.data = data;
-    this.index = index;
-    this.set = function (x, y, z) {
-        var arguments$1 = arguments;
+var Grid = function Grid(length, width, height, DataCtor, elemSize) {
+    if ( DataCtor === void 0 ) DataCtor = Int32Array;
+    if ( elemSize === void 0 ) elemSize = 1;
 
-        var i = index(x, y, z);
-        for (var j = 0; j < elemSize; ++j) {
-            data[i + j] = arguments$1[3 + j];
-        }
-    };
-    this.toArray = function (x, y, z, array, offset) {
-        var i = index(x, y, z);
-        if (array === undefined)
-            { array = []; }
-        if (offset === undefined)
-            { offset = 0; }
-        for (var j = 0; j < elemSize; ++j) {
-            array[offset + j] = data[i + j];
-        }
-    };
-    this.fromArray = function (x, y, z, array, offset) {
-        var i = index(x, y, z);
-        if (offset === undefined)
-            { offset = 0; }
-        for (var j = 0; j < elemSize; ++j) {
-            data[i + j] = array[offset + j];
-        }
-    };
-    this.copy = function (grid) {
-        this.data.set(grid.data);
-    };
-    this.clone = function () {
-        return new Grid(length, width, height, DataCtor, elemSize).copy(this);
-    };
-}
+    this.DataCtor = DataCtor;
+    this.elemSize = elemSize;
+    this.length = length;
+    this.width = width;
+    this.height = height;
+    this.data = new DataCtor(length * width * height * elemSize);
+};
+Grid.prototype.index = function index (x, y, z) {
+    return ((((x * this.width) + y) * this.height) + z) * this.elemSize;
+};
+Grid.prototype.set = function set (x, y, z) {
+        var arguments$1 = arguments;
+        var this$1 = this;
+
+    var i = this.index(x, y, z);
+    for (var j = 0; j < this.elemSize; ++j) {
+        this$1.data[i + j] = arguments$1[3 + j];
+    }
+};
+Grid.prototype.toArray = function toArray (x, y, z, array, offset) {
+        var this$1 = this;
+
+    var i = this.index(x, y, z);
+    if (array === undefined)
+        { array = []; }
+    if (offset === undefined)
+        { offset = 0; }
+    for (var j = 0; j < this.elemSize; ++j) {
+        array[offset + j] = this$1.data[i + j];
+    }
+};
+Grid.prototype.fromArray = function fromArray (x, y, z, array, offset) {
+        var this$1 = this;
+
+    var i = this.index(x, y, z);
+    if (offset === undefined)
+        { offset = 0; }
+    for (var j = 0; j < this.elemSize; ++j) {
+        this$1.data[i + j] = array[offset + j];
+    }
+};
+Grid.prototype.copy = function copy (grid) {
+    this.data.set(grid.data);
+};
+Grid.prototype.clone = function clone () {
+    return new Grid(this.length, this.width, this.height, this.DataCtor, this.elemSize).copy(this);
+};
 
 /**
  * @file EDT Surface
@@ -86397,6 +86384,8 @@ MolecularSurface.prototype.dispose = function dispose () {
  */
 var MolecularSurfaceRepresentation = (function (StructureRepresentation$$1) {
     function MolecularSurfaceRepresentation(structure, viewer, params) {
+        var this$1 = this;
+
         StructureRepresentation$$1.call(this, structure, viewer, params);
         this.type = 'surface';
         this.parameters = Object.assign({
@@ -86465,8 +86454,8 @@ var MolecularSurfaceRepresentation = (function (StructureRepresentation$$1) {
         this.__infoList = [];
         // TODO find a more direct way
         this.structure.signals.refreshed.add(function () {
-            this.__forceNewMolsurf = true;
-        }, this);
+            this$1.__forceNewMolsurf = true;
+        });
         this.init(params);
     }
 
@@ -86500,7 +86489,7 @@ var MolecularSurfaceRepresentation = (function (StructureRepresentation$$1) {
         if (!info.molsurf || info.sele !== sview.selection.string) {
             if (this.filterSele) {
                 var sviewFilter = sview.structure.getView(new Selection(this.filterSele));
-                var bbSize = sviewFilter.boundingBox.getSize();
+                var bbSize = sviewFilter.boundingBox.getSize(new Vector3);
                 var maxDim = Math.max(bbSize.x, bbSize.y, bbSize.z);
                 var asWithin = sview.getAtomSetWithinPoint(sviewFilter.center, (maxDim / 2) + 6.0);
                 sview = sview.getView(new Selection(sview.getAtomSetWithinSelection(asWithin, 3).toSeleString()));
@@ -86538,11 +86527,11 @@ var MolecularSurfaceRepresentation = (function (StructureRepresentation$$1) {
             return;
         }
         var after = function () {
-            this.__sele = this.selection.string;
-            this.__surfaceParams = JSON.stringify(this.getSurfaceParams());
-            this.__forceNewMolsurf = false;
+            this$1.__sele = this$1.selection.string;
+            this$1.__surfaceParams = JSON.stringify(this$1.getSurfaceParams());
+            this$1.__forceNewMolsurf = false;
             callback();
-        }.bind(this);
+        };
         var name = this.assembly === 'default' ? this.defaultAssembly : this.assembly;
         var assembly = this.structure.biomolDict[name];
         if (assembly) {
@@ -86574,8 +86563,10 @@ var MolecularSurfaceRepresentation = (function (StructureRepresentation$$1) {
             bufferList.push(contourBuffer);
         }
         else {
-            surfaceData.normal = surface.getNormal();
-            surfaceData.picking = surface.getPicking(sview.getStructure());
+            Object.assign(surfaceData, {
+                normal: surface.getNormal(),
+                picking: surface.getPicking(sview.getStructure())
+            });
             var surfaceBuffer = new SurfaceBuffer(surfaceData, this.getBufferParams({
                 background: this.background,
                 opaqueBack: this.opaqueBack,
@@ -86602,7 +86593,8 @@ var MolecularSurfaceRepresentation = (function (StructureRepresentation$$1) {
         data.bufferList[0].setAttributes(surfaceData);
     };
     MolecularSurfaceRepresentation.prototype.setParameters = function setParameters (params, what, rebuild) {
-        what = what || {};
+        if ( what === void 0 ) what = {};
+
         if (params && params.filterSele) {
             what.index = true;
         }
@@ -86617,6 +86609,8 @@ var MolecularSurfaceRepresentation = (function (StructureRepresentation$$1) {
         return this;
     };
     MolecularSurfaceRepresentation.prototype.getSurfaceParams = function getSurfaceParams (params) {
+        if ( params === void 0 ) params = {};
+
         var p = Object.assign({
             type: this.surfaceType,
             probeRadius: this.probeRadius,
@@ -86730,10 +86724,10 @@ var PointRepresentation = (function (StructureRepresentation$$1) {
         var atomData = data.sview.getAtomData(this.getAtomParams(what));
         var pointData = {};
         if (!what || what.position) {
-            pointData.position = atomData.position;
+            Object.assign(pointData, { position: atomData.position });
         }
         if (!what || what.color) {
-            pointData.color = atomData.color;
+            Object.assign(pointData, { color: atomData.color });
         }
         data.bufferList[0].setAttributes(pointData);
     };
@@ -86995,14 +86989,14 @@ var RibbonRepresentation = (function (StructureRepresentation$$1) {
             var subCol = spline.getSubdividedColor(this$1.getColorParams());
             var subPick = spline.getSubdividedPicking();
             var subSize = spline.getSubdividedSize(this$1.getRadiusParams());
-            bufferList.push(new RibbonBuffer({
+            bufferList.push(new RibbonBuffer(({
                 position: subPos.position,
                 normal: subOri.binormal,
                 dir: subOri.normal,
                 color: subCol.color,
                 size: subSize.size,
                 picking: subPick.picking
-            }, this$1.getBufferParams()));
+            }), this$1.getBufferParams()));
         }, sview.getSelection());
         return {
             bufferList: bufferList,
@@ -87021,17 +87015,19 @@ var RibbonRepresentation = (function (StructureRepresentation$$1) {
             if (what.position) {
                 var subPos = spline.getSubdividedPosition();
                 var subOri = spline.getSubdividedOrientation();
-                bufferData.position = subPos.position;
-                bufferData.normal = subOri.binormal;
-                bufferData.dir = subOri.normal;
+                Object.assign(bufferData, {
+                    position: subPos.position,
+                    normal: subOri.binormal,
+                    dir: subOri.normal
+                });
             }
             if (what.radius || what.scale) {
                 var subSize = spline.getSubdividedSize(this$1.getRadiusParams());
-                bufferData.size = subSize.size;
+                Object.assign(bufferData, { size: subSize.size });
             }
             if (what.color) {
                 var subCol = spline.getSubdividedColor(this$1.getColorParams());
-                bufferData.color = subCol.color;
+                Object.assign(bufferData, { color: subCol.color });
             }
             data.bufferList[i].setAttributes(bufferData);
         }
@@ -87040,7 +87036,7 @@ var RibbonRepresentation = (function (StructureRepresentation$$1) {
         var rebuild = false;
         var what = {};
         if (params && params.tension) {
-            what.position = true;
+            Object.assign(what, { position: true });
         }
         StructureRepresentation$$1.prototype.setParameters.call(this, params, what, rebuild);
         return this;
@@ -87115,19 +87111,20 @@ var RocketRepresentation = (function (StructureRepresentation$$1) {
             end: new Float32Array(length * 3),
             size: new Float32Array(length),
             color: new Float32Array(length * 3),
-            picking: new Float32Array(length)
+            picking: {}
         };
+        var picking = new Float32Array(length);
         var offset = 0;
         axisList.forEach(function (axis) {
             axisData.begin.set(axis.begin, offset * 3);
             axisData.end.set(axis.end, offset * 3);
             axisData.size.set(axis.size, offset);
             axisData.color.set(axis.color, offset * 3);
-            axisData.picking.set(axis.picking.array, offset);
+            picking.set(axis.picking.array, offset);
             offset += axis.size.length;
         });
         if (length) {
-            axisData.picking = new AtomPicker(axisData.picking, sview.getStructure());
+            axisData.picking = new AtomPicker(picking, sview.getStructure());
         }
         var cylinderBuffer = new CylinderBuffer({
             position1: axisData.begin,
@@ -87171,11 +87168,15 @@ var RocketRepresentation = (function (StructureRepresentation$$1) {
                 offset += axis.size.length;
             });
             if (what.color) {
-                cylinderData.color = data.axisData.color;
-                cylinderData.color2 = data.axisData.color;
+                Object.assign(cylinderData, {
+                    color: data.axisData.color,
+                    color2: data.axisData.color
+                });
             }
             if (what.radius || what.scale) {
-                cylinderData.radius = data.axisData.size;
+                Object.assign(cylinderData, {
+                    radius: data.axisData.size
+                });
             }
         }
         data.bufferList[0].setAttributes(cylinderData);
@@ -87272,13 +87273,13 @@ var SpacefillRepresentation = (function (StructureRepresentation$$1) {
         var atomData = data.sview.getAtomData(this.getAtomParams(what));
         var sphereData = {};
         if (!what || what.position) {
-            sphereData.position = atomData.position;
+            Object.assign(sphereData, { position: atomData.position });
         }
         if (!what || what.color) {
-            sphereData.color = atomData.color;
+            Object.assign(sphereData, { color: atomData.color });
         }
         if (!what || what.radius) {
-            sphereData.radius = atomData.radius;
+            Object.assign(sphereData, { radius: atomData.radius });
         }
         data.bufferList[0].setAttributes(sphereData);
     };
@@ -87457,11 +87458,11 @@ var TraceRepresentation = (function (StructureRepresentation$$1) {
             var spline = new Spline$1(data.polymerList[i], this$1.getSplineParams());
             if (what.position) {
                 var subPos = spline.getSubdividedPosition();
-                bufferData.position = subPos.position;
+                Object.assign(bufferData, { position: subPos.position });
             }
             if (what.color) {
                 var subCol = spline.getSubdividedColor(this$1.getColorParams());
-                bufferData.color = subCol.color;
+                Object.assign(bufferData, { color: subCol.color });
             }
             data.bufferList[i].setAttributes(bufferData);
         }
@@ -87470,7 +87471,7 @@ var TraceRepresentation = (function (StructureRepresentation$$1) {
         var rebuild = false;
         var what = {};
         if (params && params.tension) {
-            what.position = true;
+            Object.assign(what, { position: true });
         }
         StructureRepresentation$$1.prototype.setParameters.call(this, params, what, rebuild);
         return this;
@@ -87580,24 +87581,31 @@ var UnitcellRepresentation = (function (StructureRepresentation$$1) {
             bufferList: [this.sphereBuffer, this.cylinderBuffer]
         });
     };
+    UnitcellRepresentation.prototype.createData = function createData (sview) {
+        return;
+    };
     UnitcellRepresentation.prototype.updateData = function updateData (what, data) {
         var structure = data.sview.getStructure();
         var unitcellData = this.getUnitcellData(structure);
         var sphereData = {};
         var cylinderData = {};
         if (!what || what.position) {
-            sphereData.position = unitcellData.vertexPosition;
-            cylinderData.position1 = unitcellData.edgePosition1;
-            cylinderData.position2 = unitcellData.edgePosition2;
+            Object.assign(sphereData, { position: unitcellData.vertex.position });
+            Object.assign(cylinderData, {
+                position1: unitcellData.edge.position1,
+                position2: unitcellData.edge.position2
+            });
         }
         if (!what || what.color) {
-            sphereData.color = unitcellData.vertexColor;
-            cylinderData.color = unitcellData.edgeColor;
-            cylinderData.color2 = unitcellData.edgeColor;
+            Object.assign(sphereData, { color: unitcellData.vertex.color });
+            Object.assign(cylinderData, {
+                color: unitcellData.edge.color,
+                color2: unitcellData.edge.color2
+            });
         }
         if (!what || what.radius) {
-            sphereData.radius = unitcellData.vertexRadius;
-            cylinderData.radius = unitcellData.edgeRadius;
+            Object.assign(sphereData, { radius: unitcellData.vertex.radius });
+            Object.assign(cylinderData, { radius: unitcellData.edge.radius });
         }
         this.sphereBuffer.setAttributes(sphereData);
         this.cylinderBuffer.setAttributes(cylinderData);

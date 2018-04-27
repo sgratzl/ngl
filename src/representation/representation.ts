@@ -430,7 +430,7 @@ class Representation {
     this.build()
   }
 
-  build (updateWhat?: boolean) {
+  build (updateWhat?: {[k: string]: boolean}) {
     if (this.lazy && (!this.visible || !this.opacity)) {
       this.lazyProps.build = true
       return
