@@ -202,6 +202,20 @@ class DoubleSidedBuffer {
     this.frontBuffer.dispose()
     this.backBuffer.dispose()
   }
+
+  /**
+   * Customize JSON serialization to avoid circular references.
+   * Only export simple params which could be useful.
+   */
+  toJSON () {
+    var result: any = {};
+    for (var x in this) {
+      if (['side', 'size', 'visible', 'matrix', 'parameters'].includes(x)) {
+        result[x] = this[x];
+      }
+    }
+    return result;
+  }
 }
 
 export default DoubleSidedBuffer
