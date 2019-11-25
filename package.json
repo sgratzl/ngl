@@ -1,5 +1,5 @@
 {
-  "name": "ngl",
+  "name": "@sgratzl/ngl",
   "version": "2.0.0-dev.37",
   "description": "Scalable molecular graphics for the web",
   "main": "dist/ngl.js",
@@ -17,7 +17,7 @@
     "postbuild": "node ./scripts/makeScriptsList.js",
     "test": "jest",
     "preversion": "npm test",
-    "version": "npm run build-min && git add -A dist",
+    "version": "npm run build-min",
     "postversion": "git push && git push --tags",
     "prepublish": "npm test",
     "devpublish": "npm publish --tag next",
