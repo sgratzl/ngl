@@ -4,14 +4,14 @@
   "description": "Scalable molecular graphics for the web",
   "main": "dist/ngl.js",
   "module": "dist/ngl.esm.js",
-  "types": "declarations/ngl.d.ts",
+  "types": "dist/ngl.d.ts",
   "scripts": {
     "lint": "npm run lint-src && npm run lint-test && npm run lint-script",
     "lint-src": "standard \"src/**/*.js\"",
     "lint-test": "standard --env mocha \"test/**/*.js\"",
     "lint-script": "standard --global stage --global NGL \"examples/scripts/**/*.js\"",
     "ts": "tsc && cpx \"src/**/*.{vert,frag,glsl}\" build/js/src/ && cpx \"lib/*.js\" build/js/lib/ && cpx \"package.json\" build/js/ && cpx \"src/polyfills.js\" build/js/src/",
-    "dts": "tsc -d --declarationDir \"declarations\" --emitDeclarationOnly --skipLibCheck",
+    "dts": "tsc -d --declarationDir \"dist\" --emitDeclarationOnly --skipLibCheck --stripInternal",
     "prebuild": "npm run lint",
     "build": "npm run ts && rollup -c",
     "postbuild": "node ./scripts/makeScriptsList.js",
@@ -26,7 +26,10 @@
     "deploy": "./scripts/deploy.sh prerelease",
     "gallery": "./scripts/gallery.sh",
     "prerelease": "./scripts/release.sh prerelease",
-    "build-min": "npm run build && uglifyjs build/js/ngl.dev.js -cm > dist/ngl.js && cp build/js/ngl.esm.js dist/ngl.esm.js"
+    "prebuild-min": "rimraf dist",
+    "build-min": "npm run build && npm run dts && uglifyjs build/js/ngl.dev.js -cm > dist/ngl.js && cp build/js/ngl.esm.js dist/ngl.esm.js",
+    "prepare": "echo dummy",
+    "prepack": "npm run build-min"
   },
   "jest": {
     "moduleFileExtensions": [
@@ -78,6 +81,7 @@
     "jest": "^23.4.2",
     "mocha": "^5.2.0",
     "promise-polyfill": "^8.0.0",
+    "rimraf": "^3.0.0",
     "rollup": "^0.63.5",
     "rollup-plugin-babel": "^3.0.7",
     "rollup-plugin-buble": "^0.19.2",
